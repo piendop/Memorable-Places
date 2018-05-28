@@ -34,10 +34,8 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCfCY3fjsUPub_koYUnmlDc9BT8aTjPleo" />
+        <activity android:name=".MapsSecondActivity"/>
 
-        <activity
-            android:name=".MapsSecondActivity"
-            android:label="@string/title_activity_maps_second"></activity>
     </application>
 
 </manifest>

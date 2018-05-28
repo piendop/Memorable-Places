@@ -3,6 +3,7 @@ package com.example.piendop.memorableplaces;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -27,6 +28,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -35,28 +37,7 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
     //global variables
     private GoogleMap mMap;
     LocationManager locationManager;
-    LocationListener locationListener = new LocationListener() {
-        @Override
-        public void onLocationChanged(Location location) {
-            //zoom the user location
-            centerUserLocation(location,"Your location");
-        }
-
-        @Override
-        public void onStatusChanged(String s, int i, Bundle bundle) {
-
-        }
-
-        @Override
-        public void onProviderEnabled(String s) {
-
-        }
-
-        @Override
-        public void onProviderDisabled(String s) {
-
-        }
-    };
+    LocationListener locationListener;
 
 
     //if we have an allow from user to get the location we do a request on permission's result
@@ -146,6 +127,29 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
         //if we change the location it will update for us
         if(intent.getIntExtra("placeNumber",0)==0){
 
+            locationListener = new LocationListener() {
+                @Override
+                public void onLocationChanged(Location location) {
+                    //zoom the user location
+                    centerUserLocation(location,"Your location");
+                }
+
+                @Override
+                public void onStatusChanged(String s, int i, Bundle bundle) {
+
+                }
+
+                @Override
+                public void onProviderEnabled(String s) {
+
+                }
+
+                @Override
+                public void onProviderDisabled(String s) {
+
+                }
+            };
+
             /*THE FIRST TIME TIME TIME OR THE NEXT TIME OPEN THE APP*/
             //so for the first time open the app we don't click anything so it must show marker in the previous location
             //ask user to allow get location
@@ -184,6 +188,8 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
 
     @Override
     public void onMapLongClick(LatLng latLng) {
+        //remove location listener so that it cannot update
+        locationManager.removeUpdates(locationListener);
         //get the address from click buttons
         String address = getAddress(latLng);
         //add marker of this clicked location
@@ -192,10 +198,55 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
         //update places and locations in memorable places list
         MainActivity.places.add(address);
         MainActivity.locations.add(latLng);
-        //notifyDataSetChanged()
+
+        /**************notifyDataSetChanged()********/
         //Notifies the attached observers that the underlying data has been changed and any
         // View reflecting the data set should refresh itself.
         MainActivity.arrayAdapter.notifyDataSetChanged();
+
+        /*****************store data to permanent storage***********************/
+        SharedPreferences sharedPreferences = this.getSharedPreferences
+                ("com.example.piendop.memorableplaces",Context.MODE_PRIVATE);
+        //store places
+        try {
+            ArrayList<String> latitudes= new ArrayList<>();
+            ArrayList<String> longitudes= new ArrayList<>();
+
+            for(LatLng coordinates: MainActivity.locations){
+                latitudes.add(Double.toString(coordinates.latitude));
+                longitudes.add(Double.toString(coordinates.longitude));
+            }
+            sharedPreferences.edit().putString
+                    ("places",ObjectSerializer.serialize(MainActivity.places)).apply();
+            sharedPreferences.edit().putString
+                    ("latitudes",ObjectSerializer.serialize(latitudes)).apply();
+            sharedPreferences.edit().putString
+                    ("longitudes",ObjectSerializer.serialize(longitudes)).apply();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
+        /****log to check if we have stored it or not*******/
+
+        /*try {
+            ArrayList<String> places;
+            ArrayList<String> _latitudes;
+            ArrayList<String> _longitudes;
+            places =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
+                    getString("places",ObjectSerializer.serialize(new ArrayList<String>())));
+            _latitudes =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
+                    getString("latitudes",ObjectSerializer.serialize(new ArrayList<String>())));
+            _longitudes =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
+                    getString("longitudes",ObjectSerializer.serialize(new ArrayList<String>())));
+            Log.i("places",places.toString());
+            Log.i("latitudes",_latitudes.toString());
+            Log.i("longitudes",_longitudes.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }*/
+
+        /**********************************************************************************/
         //notify location is saved
         Toast.makeText(this, "Location Saved", Toast.LENGTH_SHORT).show();
     }
