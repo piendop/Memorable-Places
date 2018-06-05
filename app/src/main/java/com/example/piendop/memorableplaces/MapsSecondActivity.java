@@ -29,6 +29,7 @@ import com.google.android.gms.maps.model.MarkerOptions;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -38,62 +39,6 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
     private GoogleMap mMap;
     LocationManager locationManager;
     LocationListener locationListener;
-
-
-    //if we have an allow from user to get the location we do a request on permission's result
-    //method for zooming user location
-    public void centerUserLocation(Location location, String address){
-        LatLng userLocation = new LatLng(location.getLatitude(),location.getLongitude());
-
-        if(address!="Your location"){
-            //add marker for memorable places at the first time
-            mMap.addMarker(new MarkerOptions().position(userLocation).title(address));
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation,10));
-        }else{//your location case
-            //clear markers
-            mMap.clear();
-            mMap.addMarker(new MarkerOptions().position(userLocation).title(address));
-            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation,10));
-        }
-    }
-
-    private String getAddress(LatLng latLng) {
-
-        //create a geocoder to get the address of clicked location
-        Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
-        //return address
-        String addressInfo="Could not find the address";
-        //create a list address to store addresses of clicked location
-        try {//use try catch to check if its created or not
-            List<Address> addressList = geocoder.getFromLocation(latLng.latitude,latLng.longitude,1);
-            //check if we have address or not ==> check null and empty size
-            if(addressList!=null && addressList.size()>0){
-                Address address = addressList.get(0);
-                addressInfo = address.getAddressLine(0);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return addressInfo;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if(grantResults.length>0 && grantResults[0]== PackageManager.PERMISSION_GRANTED){
-            //we check self-permission again to make sure
-            startListening();
-        }
-    }
-    //check self permission to update user location if yes center location
-    private void startListening() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED) {
-            //request location update will call onClickListener in onMapReady method
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0,locationListener);
-        }
-    }
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -127,6 +72,7 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
         //if we change the location it will update for us
         if(intent.getIntExtra("placeNumber",0)==0){
 
+            //onLocationChanged when request location update by location manager
             locationListener = new LocationListener() {
                 @Override
                 public void onLocationChanged(Location location) {
@@ -180,15 +126,18 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
                     get(intent.getIntExtra("placeNumber",0)).latitude);
             memorableLocation.setLongitude(MainActivity.locations.
                     get(intent.getIntExtra("placeNumber",0)).longitude);
+            //center to memorable places
             centerUserLocation(memorableLocation,MainActivity.places.
                     get(intent.getIntExtra("placeNumber",0)));
 
         }
     }
 
+    /**add new place*/
     @Override
     public void onMapLongClick(LatLng latLng) {
-        //remove location listener so that it cannot update
+        //remove location listener so that it cannot update to user
+        // location when we add new places by click long marker
         locationManager.removeUpdates(locationListener);
         //get the address from click buttons
         String address = getAddress(latLng);
@@ -197,6 +146,7 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
 
         //update places and locations in memorable places list
         MainActivity.places.add(address);
+        HashSet<String> setPlaces = new HashSet<>(MainActivity.places);
         MainActivity.locations.add(latLng);
 
         /**************notifyDataSetChanged()********/
@@ -207,47 +157,80 @@ public class MapsSecondActivity extends FragmentActivity implements OnMapReadyCa
         /*****************store data to permanent storage***********************/
         SharedPreferences sharedPreferences = this.getSharedPreferences
                 ("com.example.piendop.memorableplaces",Context.MODE_PRIVATE);
-        //store places
-        try {
-            ArrayList<String> latitudes= new ArrayList<>();
-            ArrayList<String> longitudes= new ArrayList<>();
 
-            for(LatLng coordinates: MainActivity.locations){
-                latitudes.add(Double.toString(coordinates.latitude));
-                longitudes.add(Double.toString(coordinates.longitude));
-            }
-            sharedPreferences.edit().putString
-                    ("places",ObjectSerializer.serialize(MainActivity.places)).apply();
-            sharedPreferences.edit().putString
-                    ("latitudes",ObjectSerializer.serialize(latitudes)).apply();
-            sharedPreferences.edit().putString
-                    ("longitudes",ObjectSerializer.serialize(longitudes)).apply();
-        } catch (IOException e) {
-            e.printStackTrace();
+        /**UPDATE PLACES*/
+        HashSet<String> setLatitudes = new HashSet<>();
+        HashSet<String> setLongitudes=new HashSet<>();
+
+        for(LatLng coordinates: MainActivity.locations){
+            setLatitudes.add(Double.toString(coordinates.latitude));
+            setLongitudes.add(Double.toString(coordinates.longitude));
         }
+        sharedPreferences.edit().putStringSet
+                ("places",setPlaces).apply();
+        sharedPreferences.edit().putStringSet
+                ("latitudes",setLatitudes).apply();
+        sharedPreferences.edit().putStringSet
+                ("longitudes",setLongitudes).apply();
 
-
-        /****log to check if we have stored it or not*******/
-
-        /*try {
-            ArrayList<String> places;
-            ArrayList<String> _latitudes;
-            ArrayList<String> _longitudes;
-            places =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
-                    getString("places",ObjectSerializer.serialize(new ArrayList<String>())));
-            _latitudes =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
-                    getString("latitudes",ObjectSerializer.serialize(new ArrayList<String>())));
-            _longitudes =(ArrayList<String>) ObjectSerializer.deserialize(sharedPreferences.
-                    getString("longitudes",ObjectSerializer.serialize(new ArrayList<String>())));
-            Log.i("places",places.toString());
-            Log.i("latitudes",_latitudes.toString());
-            Log.i("longitudes",_longitudes.toString());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
 
         /**********************************************************************************/
         //notify location is saved
         Toast.makeText(this, "Location Saved", Toast.LENGTH_SHORT).show();
     }
+
+    private String getAddress(LatLng latLng) {
+
+        //create a geocoder to get the address of clicked location
+        Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+        //return address
+        String addressInfo="Could not find the address";
+        //create a list address to store addresses of clicked location
+        try {//use try catch to check if its created or not
+            List<Address> addressList = geocoder.getFromLocation(latLng.latitude,latLng.longitude,1);
+            //check if we have address or not ==> check null and empty size
+            if(addressList!=null && addressList.size()>0){
+                Address address = addressList.get(0);
+                addressInfo = address.getAddressLine(0);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return addressInfo;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(grantResults.length>0 && grantResults[0]== PackageManager.PERMISSION_GRANTED){
+            //we check self-permission again to make sure
+            startListening();
+        }
+    }
+    //check self permission to update user location if yes center location
+    private void startListening() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            //request location update will call onClickListener in onMapReady method
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0,locationListener);
+        }
+    }
+    //if we have an allow from user to get the location we do a request on permission's result
+    //method for zooming user location
+    public void centerUserLocation(Location location, String address){
+        LatLng userLocation = new LatLng(location.getLatitude(),location.getLongitude());
+
+        if(address!="Your location"){
+            //add marker for memorable places
+            mMap.addMarker(new MarkerOptions().position(userLocation).title(address));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation,10));
+        }else{//your location case
+            //clear markers
+            mMap.clear();
+            mMap.addMarker(new MarkerOptions().position(userLocation).title(address));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLocation,10));
+        }
+    }
 }
+
+
